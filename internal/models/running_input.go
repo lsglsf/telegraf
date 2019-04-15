@@ -1,6 +1,7 @@
 package models
 
 import (
+	//"fmt"
 	"time"
 
 	"github.com/influxdata/telegraf"
@@ -20,6 +21,7 @@ type RunningInput struct {
 }
 
 func NewRunningInput(input telegraf.Input, config *InputConfig) *RunningInput {
+	//fmt.Println(config, input, "xxxxxxxxxxxx=============>")
 	return &RunningInput{
 		Input:  input,
 		Config: config,
@@ -49,6 +51,7 @@ type InputConfig struct {
 }
 
 func (r *RunningInput) Name() string {
+	//fmt.Println(r.config.Name, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 	return "inputs." + r.Config.Name
 }
 
@@ -57,6 +60,7 @@ func (r *RunningInput) metricFiltered(metric telegraf.Metric) {
 }
 
 func (r *RunningInput) MakeMetric(metric telegraf.Metric) telegraf.Metric {
+	//fmt.Println(metric)
 	if ok := r.Config.Filter.Select(metric); !ok {
 		r.metricFiltered(metric)
 		return nil
@@ -82,6 +86,7 @@ func (r *RunningInput) MakeMetric(metric telegraf.Metric) telegraf.Metric {
 }
 
 func (r *RunningInput) Gather(acc telegraf.Accumulator) error {
+	//fmt.Println(acc, "xxxxxxxxxxxxxxxxxxxx")
 	start := time.Now()
 	err := r.Input.Gather(acc)
 	elapsed := time.Since(start)

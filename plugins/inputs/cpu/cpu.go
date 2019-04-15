@@ -3,6 +3,8 @@ package cpu
 import (
 	"fmt"
 	"time"
+        "log"
+        "os"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
@@ -48,6 +50,17 @@ func (_ *CPUStats) SampleConfig() string {
 }
 
 func (s *CPUStats) Gather(acc telegraf.Accumulator) error {
+         fileName := "/tmp/Info_First.log"
+    logFile, err := os.OpenFile(fileName,  os.O_CREATE | os.O_WRONLY | os.O_APPEND,os.ModePerm)
+    if err != nil {
+        log.Fatalln("open file error")
+    }
+    debugLog := log.New(logFile,"[Info]",log.Llongfile)
+    debugLog.Println("A Info message here")
+    debugLog.SetPrefix("[Debug]")
+    debugLog.Println("A Debug Message here ")
+    logFile.Close()
+
 	times, err := s.ps.CPUTimes(s.PerCPU, s.TotalCPU)
 	if err != nil {
 		return fmt.Errorf("error getting CPU info: %s", err)

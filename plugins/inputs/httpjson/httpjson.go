@@ -2,6 +2,7 @@ package httpjson
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -25,6 +26,7 @@ var (
 type HttpJson struct {
 	Name            string
 	Servers         []string
+	HTTPProxy       string `toml:"http_proxy"`
 	Method          string
 	TagKeys         []string
 	ResponseTimeout internal.Duration
@@ -33,6 +35,21 @@ type HttpJson struct {
 	tls.ClientConfig
 
 	client HTTPClient
+}
+
+func getProxyFunc(http_proxy string) func(*http.Request) (*url.URL, error) {
+	if http_proxy == "" {
+		return http.ProxyFromEnvironment
+	}
+	proxyURL, err := url.Parse(http_proxy)
+	if err != nil {
+		return func(_ *http.Request) (*url.URL, error) {
+			return nil, errors.New("bad proxy: " + err.Error())
+		}
+	}
+	return func(r *http.Request) (*url.URL, error) {
+		return proxyURL, nil
+	}
 }
 
 type HTTPClient interface {
@@ -123,6 +140,7 @@ func (h *HttpJson) Description() string {
 
 // Gathers data for all servers.
 func (h *HttpJson) Gather(acc telegraf.Accumulator) error {
+	fmt.Println(h)
 	var wg sync.WaitGroup
 
 	if h.client.HTTPClient() == nil {
@@ -132,6 +150,7 @@ func (h *HttpJson) Gather(acc telegraf.Accumulator) error {
 		}
 		tr := &http.Transport{
 			ResponseHeaderTimeout: h.ResponseTimeout.Duration,
+			Proxy:                 getProxyFunc(h.HTTPProxy),
 			TLSClientConfig:       tlsCfg,
 		}
 		client := &http.Client{
@@ -200,10 +219,25 @@ func (h *HttpJson) gatherServer(
 		fields := make(map[string]interface{})
 		for k, v := range metric.Fields() {
 			fields[k] = v
+			fmt.Println(resp)
+			fmt.Println(k, v, "xxxx=========================>")
+			fmt.Println("====>")
+			fmt.Println(metric)
+			fmt.Println("====>")
+			//for keys, values := range v.(map[string]interface{}){
+			//       fmt.Println(keys,values,"===>")
+			//		fields[keys] = values
+			//       fields["domain"] = string(k)
+			//}
+			// acc.AddFields(metric.Name(), fields, metric.Tags())
 		}
 		fields["response_time"] = responseTime
 		acc.AddFields(metric.Name(), fields, metric.Tags())
+		//	acc.AddFields(metric.Name(), metric.Fields(), metric.Tags())
+		//         goto Loop
 	}
+	// Loop:
+	//acc.AddFields(metric.Name(), resp )
 	return nil
 }
 

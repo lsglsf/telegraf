@@ -4,15 +4,20 @@ import (
 	"compress/gzip"
 	"crypto/subtle"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/internal"
+	"github.com/influxdata/telegraf/internal/config"
 	tlsint "github.com/influxdata/telegraf/internal/tls"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	"github.com/influxdata/telegraf/plugins/parsers"
@@ -21,6 +26,10 @@ import (
 // defaultMaxBodySize is the default maximum request body size, in bytes.
 // if the request body is over this size, we will return an HTTP 413 error.
 // 500 MB
+type Agent struct {
+	Config *config.Config
+}
+
 const defaultMaxBodySize = 500 * 1024 * 1024
 
 type TimeFunc func() time.Time
@@ -33,6 +42,7 @@ type HTTPListenerV2 struct {
 	WriteTimeout   internal.Duration
 	MaxBodySize    internal.Size
 	Port           int
+	Allowip        string
 
 	tlsint.ServerConfig
 
@@ -97,6 +107,7 @@ func (h *HTTPListenerV2) Description() string {
 }
 
 func (h *HTTPListenerV2) Gather(_ telegraf.Accumulator) error {
+	//func (h *HTTPListenerV2) Gather(a *Agent) error {
 	return nil
 }
 
@@ -171,8 +182,32 @@ func (h *HTTPListenerV2) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func RemoteIp(req *http.Request) string {
+	remoteAddr := req.RemoteAddr
+	if ip := req.Header.Get("XRealIP"); ip != "" {
+		remoteAddr = ip
+	} else if ip = req.Header.Get("XForwardedFor"); ip != "" {
+		remoteAddr = ip
+	} else {
+		remoteAddr, _, _ = net.SplitHostPort(remoteAddr)
+	}
+
+	if remoteAddr == "::1" {
+		remoteAddr = "127.0.0.1"
+	}
+	//fmt.Println(remoteAddr)
+	return remoteAddr
+}
+
 func (h *HTTPListenerV2) serveWrite(res http.ResponseWriter, req *http.Request) {
 	// Check that the content length is not too large for us to handle.
+	remoteip := RemoteIp(req)
+	//fmt.Println(strings.Contains(h.Allowip, remoteip))
+	ipstatus := strings.Contains(h.Allowip, remoteip)
+	if ipstatus == false {
+		badRequest(res)
+		return
+	}
 	if req.ContentLength > h.MaxBodySize.Size {
 		tooLarge(res)
 		return
@@ -204,20 +239,57 @@ func (h *HTTPListenerV2) serveWrite(res http.ResponseWriter, req *http.Request) 
 		defer body.Close()
 	}
 
+	//fmt.Println(string(body))
 	body = http.MaxBytesReader(res, body, h.MaxBodySize.Size)
+	//fmt.Println(string(body))
 	bytes, err := ioutil.ReadAll(body)
+	bytes1 := bytes
+
+	var dat map[string]interface{}
+	if err := json.Unmarshal(bytes1, &dat); err == nil {
+		//fmt.Println(dat, "xxxxxxxxxxxxxxxxxxxxxxx")
+		//fmt.Println(dat["key"], dat["xxx"])
+		log.Println("info " + string(bytes1))
+		if dat["key"] == "urlcode" {
+			//fmt.Println(dat["value"].([]string))
+			var datas string
+
+			for _, elem := range dat["value"].([]interface{}) {
+				datas += elem.(string)
+				datas += "\n"
+				//		fmt.Println(datas, "xxxxxxxxx============================================")
+			}
+			f, err1 := os.OpenFile("/tmp/urlcode.txt", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0664)
+			defer f.Close()
+			if err1 != nil {
+				fmt.Println(err1.Error())
+			} else {
+				_, err = f.Write([]byte(datas))
+				okRequest(res)
+			}
+
+		}
+	} else {
+		fmt.Println(err)
+	}
+	//var dat map[string]interface{}
+	//json.Unmarshal(bytes1, &dat)
+	//fmt.Println(bytes1)
+
 	if err != nil {
 		tooLarge(res)
 		return
 	}
 
 	metrics, err := h.Parse(bytes)
+
 	if err != nil {
 		log.Println("D! " + err.Error())
 		badRequest(res)
 		return
 	}
 	for _, m := range metrics {
+		fmt.Println(m.Fields(), m.Name(), "XXXXXXXXXXXXXXXXXXXXX")
 		h.acc.AddFields(m.Name(), m.Fields(), m.Tags(), m.Time())
 	}
 	res.WriteHeader(http.StatusNoContent)
@@ -244,6 +316,12 @@ func badRequest(res http.ResponseWriter) {
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusBadRequest)
 	res.Write([]byte(`{"error":"http: bad request"}`))
+}
+
+func okRequest(res http.ResponseWriter) {
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusBadRequest)
+	res.Write([]byte(`{"status":"ok"}`))
 }
 
 func (h *HTTPListenerV2) AuthenticateIfSet(handler http.HandlerFunc, res http.ResponseWriter, req *http.Request) {

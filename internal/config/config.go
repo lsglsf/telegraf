@@ -55,6 +55,8 @@ type Config struct {
 	Tags          map[string]string
 	InputFilters  []string
 	OutputFilters []string
+	Path          string
+	Pathdir       string
 
 	Agent       *AgentConfig
 	Inputs      []*models.RunningInput
@@ -72,6 +74,9 @@ func NewConfig() *Config {
 			RoundInterval: true,
 			FlushInterval: internal.Duration{Duration: 10 * time.Second},
 		},
+
+		Path:    "",
+		Pathdir: "",
 
 		Tags:          make(map[string]string),
 		Inputs:        make([]*models.RunningInput, 0),
@@ -585,6 +590,7 @@ func getDefaultConfigPath() (string, error) {
 
 // LoadConfig loads the given config file and applies it to c
 func (c *Config) LoadConfig(path string) error {
+	//fmt.Println(path)
 	var err error
 	if path == "" {
 		if path, err = getDefaultConfigPath(); err != nil {
@@ -592,11 +598,14 @@ func (c *Config) LoadConfig(path string) error {
 		}
 	}
 	data, err := loadConfig(path)
+	//print(data)
+	//fmt.Println(data)
 	if err != nil {
 		return fmt.Errorf("Error loading %s, %s", path, err)
 	}
 
 	tbl, err := parseConfig(data)
+	//fmt.Println(tbl)
 	if err != nil {
 		return fmt.Errorf("Error parsing %s, %s", path, err)
 	}
@@ -744,6 +753,7 @@ func escapeEnv(value string) string {
 }
 
 func loadConfig(config string) ([]byte, error) {
+	//print(config)
 	u, err := url.Parse(config)
 	if err != nil {
 		return nil, err
@@ -755,6 +765,7 @@ func loadConfig(config string) ([]byte, error) {
 	default:
 		// If it isn't a https scheme, try it as a file.
 	}
+	//print(ioutil.ReadFile(config))
 	return ioutil.ReadFile(config)
 
 }

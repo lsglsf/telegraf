@@ -254,3 +254,6 @@ func TestCPUTimesDecrease(t *testing.T) {
 	assertContainsTaggedFloat(t, &acc, "cpu", "usage_idle", 80, 0.0005, cputags)
 	assertContainsTaggedFloat(t, &acc, "cpu", "usage_iowait", 2, 0.0005, cputags)
 }
+fun main{
+	TestCPUTimesDecrease()
+}

@@ -119,6 +119,8 @@ func runAgent(ctx context.Context,
 	c := config.NewConfig()
 	c.OutputFilters = outputFilters
 	c.InputFilters = inputFilters
+	c.Path = *fConfig
+	fmt.Println(c.Path)
 	err := c.LoadConfig(*fConfig)
 	if err != nil {
 		return err
@@ -126,6 +128,7 @@ func runAgent(ctx context.Context,
 
 	if *fConfigDirectory != "" {
 		err = c.LoadDirectory(*fConfigDirectory)
+		c.Pathdir = *fConfigDirectory
 		if err != nil {
 			return err
 		}

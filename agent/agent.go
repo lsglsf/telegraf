@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	//	"reflect"
 	"runtime"
 	"sync"
 	"time"
@@ -297,11 +298,28 @@ func (a *Agent) gatherOnce(
 	input *models.RunningInput,
 	timeout time.Duration,
 ) error {
+	//fmt.Println(input.Config.Name)
 	ticker := time.NewTicker(timeout)
 	defer ticker.Stop()
 
 	done := make(chan error)
 	go func() {
+		/*
+			value := reflect.ValueOf(input.Input)
+			fmt.Println(value)
+			value = value.Elem()
+			//for i := 0; i < value.NumField(); i++ {
+			//	fmt.Printf("Field %d: %v\n", i, value.Field(i))
+			//}
+			f := value.FieldByName("URLs")
+			if f.IsValid() {
+				if f.Kind() == reflect.Slice {
+					fmt.Println("test=====================================================================================>", f)
+					sliceValue := reflect.ValueOf([]string{"http://www.yunfan.com/", "https://blog.csdn.net/"})
+					f.Set(sliceValue)
+				}
+			}*/
+		//fmt.Println(input.Gather(acc), "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 		done <- input.Gather(acc)
 	}()
 
@@ -471,6 +489,7 @@ func (a *Agent) runOutputs(
 	}
 
 	for metric := range src {
+		//fmt.Println("xxxxxxxxxxxxxxxxxxxxxxx metric", metric)
 		for i, output := range a.Config.Outputs {
 			if i == len(a.Config.Outputs)-1 {
 				output.AddMetric(metric)
